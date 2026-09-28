@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simpanan Saya</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d1d1b;--mut:#6b6a63;--bd:#e4e2da;--ac:#3b5bdb;--acx:#fff;--ok:#2b8a3e;--dn:#c92a2a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#212120;--tx:#eeede8;--mut:#9a988f;--bd:#33332f;--ac:#7c93f5;--acx:#111;--ok:#69db7c;--dn:#ff8787}}
+:root[data-theme="dark"]{--bg:#161615;--card:#212120;--tx:#eeede8;--mut:#9a988f;--bd:#33332f;--ac:#7c93f5;--acx:#111;--ok:#69db7c;--dn:#ff8787}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.w{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}
+.sub{color:var(--mut);margin:0 0 14px;font-size:13px}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{flex:1}
+input,textarea,select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit;margin-bottom:8px}
+textarea{min-height:90px;resize:vertical}
+button{font:inherit;padding:8px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+button.p{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:600}
+button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--bd);color:var(--mut);cursor:pointer;background:var(--bg)}
+.chip.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.item h3{margin:0 0 4px;font-size:16px}
+.meta{font-size:12px;color:var(--mut);margin-bottom:6px}
+.body{white-space:pre-wrap;word-break:break-word;background:var(--bg);border-radius:10px;padding:10px;font-size:14px;max-height:160px;overflow:auto}
+.item a{color:var(--ac);word-break:break-all}
+.act{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.act button{font-size:13px;padding:5px 10px}
+.empty{text-align:center;color:var(--mut);padding:30px 0}
+.tag{font-size:12px;color:var(--ac);margin-right:6px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 16px;border-radius:99px;font-size:13px;opacity:0;pointer-events:none;transition:.2s}
+.toast.s{opacity:1}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>📌 Simpanan Saya</h1>
+<p class="sub">Simpan prompt & link dari internet, Threads, Instagram, dll. Data tersimpan di server & sinkron di semua perangkat.</p>
+
+<div class="box">
+<div class="tabs"><button id="tP" class="on" onclick="setType('prompt')">✨ Prompt</button><button id="tL" onclick="setType('link')">🔗 Link</button></div>
+<input id="ti" placeholder="Judul (opsional)">
+<textarea id="ct" placeholder="Tempel prompt di sini"></textarea>
+<input id="sr" placeholder="Sumber (misal: Threads @akun) — opsional" list="srl">
+<datalist id="srl"><option>Threads</option><option>Instagram</option><option>TikTok</option><option>YouTube</option><option>X / Twitter</option><option>Website</option></datalist>
+<input id="tg" placeholder="Tag, pisahkan koma (misal: gambar, coding)">
+<div class="row"><button class="p" id="sv" onclick="save()">Simpan</button><button id="cn" onclick="resetForm()" style="display:none">Batal</button></div>
+</div>
+
+<div class="box">
+<input id="q" placeholder="🔍 Cari judul, isi, tag..." oninput="render()">
+<div class="row">
+<button id="fA" class="on" onclick="setF('all')">Semua</button><button id="fP" onclick="setF('prompt')">Prompt</button><button id="fL" onclick="setF('link')">Link</button><button id="fF" onclick="setF('fav')">⭐ Favorit</button>
+</div>
+<div class="chips" id="tags"></div>
+</div>
+
+<div id="list"></div>
+
+<div class="box row">
+<button onclick="exp()">⬇ Backup (JSON)</button>
+<button onclick="document.getElementById('im').click()">⬆ Pulihkan</button>
+<input id="im" type="file" accept=".json" style="display:none" onchange="imp(event)">
+<button id="mig" style="display:none"></button><span class="sub" style="margin:0"><span id="cnt"></span> · <span id="st"></span></span>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var KEY="simpanan_v1",items=[],type="prompt",filt="all",tagF="",editId=null;
+var db=null,col=null;
+function loadLocal(){try{items=JSON.parse(localStorage.getItem(KEY)||"[]")||[]}catch(e){items=[]}}
+function persist(){if(db)return;try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){toast("Gagal menyimpan")}}
+function saveItem(it){if(!db){persist();return}
+var o={};Object.keys(it).forEach(function(k){o[k]=it[k]});o.id=String(it.id);
+col.doc(o.id).set(o).catch(function(e){toast("Gagal simpan ke server: "+(e&&e.code||""))})}
+function removeItem(id){if(!db){persist();return}col.doc(String(id)).delete().catch(function(){toast("Gagal menghapus")})}
+function sortItems(){items.sort(function(a,b){return String(b.date).localeCompare(String(a.date))})}
+function status(m){$("cnt").title=m;$("st").textContent=m}
+async function init(){loadLocal();render();
+try{db=await claude.use("db")}catch(e){db=null}
+if(!db){status("Mode lokal (browser)");return}
+col=db.collection("items");status("☁ Tersimpan di server");
+col.onSnapshot(function(snap){items=snap.docs.map(function(d){return d.data()});sortItems();render()},function(e){status("Server error: "+(e&&e.code||""))});
+var loc=[];try{loc=JSON.parse(localStorage.getItem(KEY)||"[]")||[]}catch(e){}
+if(loc.length){$("mig").style.display="";$("mig").textContent="⇪ Pindahkan "+loc.length+" data lama ke server";$("mig").onclick=function(){loc.forEach(function(x){if(x&&x.content){x.tags=x.tags||[];saveItem(x)}});try{localStorage.removeItem(KEY)}catch(e){}$("mig").style.display="none";toast("Dipindahkan ✓")}}}
+function $(i){return document.getElementById(i)}
+function toast(m){var t=$("toast");t.textContent=m;t.className="toast s";setTimeout(function(){t.className="toast"},1600)}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function setType(t){type=t;$("tP").className=t=="prompt"?"on":"";$("tL").className=t=="link"?"on":"";
+$("ct").placeholder=t=="prompt"?"Tempel prompt di sini":"Tempel link (https://...) + catatan jika perlu"}
+function setF(f){filt=f;["A","P","L","F"].forEach(function(k){$("f"+k).className=""});
+$("f"+({all:"A",prompt:"P",link:"L",fav:"F"}[f])).className="on";render()}
+function guess(u){var m=[["threads.","Threads"],["instagram.","Instagram"],["tiktok.","TikTok"],["youtu","YouTube"],["twitter.","X / Twitter"],["x.com","X / Twitter"],["facebook.","Facebook"],["github.","GitHub"]];
+for(var i=0;i<m.length;i++)if(u.indexOf(m[i][0])>-1)return m[i][1];return u?"Website":""}
+function save(){var ct=$("ct").value.trim();if(!ct){toast("Isi tidak boleh kosong");return}
+var tags=$("tg").value.split(",").map(function(s){return s.trim().toLowerCase()}).filter(Boolean);
+var url=(ct.match(/https?:\/\/\S+/)||[""])[0];
+var src=$("sr").value.trim()||(type=="link"?guess(url):"");
+var title=$("ti").value.trim()||(type=="link"?(url||ct).replace(/^https?:\/\//,"").slice(0,50):ct.split("\n")[0].slice(0,50));
+var it=null;if(editId){it=items.find(function(x){return x.id==editId});if(it){it.type=type;it.title=title;it.content=ct;it.source=src;it.tags=tags}}
+else{var nw={id:String(Date.now()),type:type,title:title,content:ct,source:src,tags:tags,fav:false,date:new Date().toISOString()};items.unshift(nw);saveItem(nw)}
+if(editId&&it)saveItem(it);if(!db)persist();resetForm();render();toast("Tersimpan ✓")}
+function resetForm(){editId=null;["ti","ct","sr","tg"].forEach(function(i){$(i).value=""});$("sv").textContent="Simpan";$("cn").style.display="none"}
+function edit(id){var it=items.find(function(x){return x.id==id});if(!it)return;editId=id;setType(it.type);
+$("ti").value=it.title;$("ct").value=it.content;$("sr").value=it.source;$("tg").value=it.tags.join(", ");
+$("sv").textContent="Update";$("cn").style.display="";window.scrollTo({top:0,behavior:"smooth"})}
+function del(id){if(!confirm("Hapus item ini?"))return;items=items.filter(function(x){return x.id!=id});removeItem(id);persist();render()}
+function fav(id){var it=items.find(function(x){return x.id==id});it.fav=!it.fav;saveItem(it);render()}
+function copy(id){var it=items.find(function(x){return x.id==id});
+function ok(){toast("Disalin ✓")}
+try{navigator.clipboard.writeText(it.content).then(ok,fb)}catch(e){fb()}
+function fb(){var t=document.createElement("textarea");t.value=it.content;document.body.appendChild(t);t.select();try{document.execCommand("copy");ok()}catch(e){toast("Gagal menyalin")}t.remove()}}
+function pickTag(t){tagF=tagF==t?"":t;render()}
+function render(){var q=$("q").value.toLowerCase();var all={};
+items.forEach(function(i){i.tags.forEach(function(t){all[t]=1})});
+$("tags").innerHTML=Object.keys(all).sort().map(function(t){return '<span class="chip'+(tagF==t?" on":"")+'" onclick="pickTag(\''+esc(t).replace(/'/g,"")+'\')">#'+esc(t)+'</span>'}).join("");
+var r=items.filter(function(i){
+if(filt=="prompt"&&i.type!="prompt")return false;if(filt=="link"&&i.type!="link")return false;if(filt=="fav"&&!i.fav)return false;
+if(tagF&&i.tags.indexOf(tagF)<0)return false;
+return !q||(i.title+" "+i.content+" "+i.source+" "+i.tags.join(" ")).toLowerCase().indexOf(q)>-1});
+$("cnt").textContent=items.length+" item";
+if(!r.length){$("list").innerHTML='<div class="empty">'+(items.length?"Tidak ada hasil.":"Belum ada simpanan. Tambahkan yang pertama di atas 👆")+'</div>';return}
+$("list").innerHTML=r.map(function(i){
+var url=(i.content.match(/https?:\/\/\S+/)||[""])[0];
+var body=i.type=="link"&&url?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>'+(i.content.replace(url,"").trim()?'<div class="body" style="margin-top:6px">'+esc(i.content.replace(url,"").trim())+'</div>':""):'<div class="body">'+esc(i.content)+'</div>';
+return '<div class="box item"><h3>'+(i.type=="prompt"?"✨ ":"🔗 ")+esc(i.title)+'</h3><div class="meta">'+(i.source?esc(i.source)+" · ":"")+new Date(i.date).toLocaleDateString("id-ID")+'</div>'+body+
+(i.tags.length?'<div style="margin-top:6px">'+i.tags.map(function(t){return '<span class="tag">#'+esc(t)+'</span>'}).join("")+'</div>':"")+
+'<div class="act"><button onclick="copy(\''+i.id+'\')">📋 Salin</button>'+(url&&i.type=="link"?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer"><button>↗ Buka</button></a>':"")+
+'<button onclick="fav(\''+i.id+'\')">'+(i.fav?"⭐":"☆")+'</button><button onclick="edit(\''+i.id+'\')">✏️</button><button onclick="del(\''+i.id+'\')" style="color:var(--dn)">🗑</button></div></div>'}).join("")}
+function exp(){var b=new Blob([JSON.stringify(items,null,2)],{type:"application/json"});var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="simpanan-backup.json";a.click()}
+function imp(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;
+var ids={};items.forEach(function(x){ids[x.id]=1});d.forEach(function(x){if(x&&x.content&&!ids[x.id]){x.tags=x.tags||[];x.id=String(x.id);if(!db)items.push(x);saveItem(x)}});persist();render();toast("Berhasil dipulihkan")}catch(err){toast("File tidak valid")}};r.readAsText(f)}
+init();
+</script>
+</body>
+</html>
